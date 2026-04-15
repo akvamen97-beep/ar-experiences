@@ -1,0 +1,10 @@
+{
+  "name": "Тестовый проект",
+  "trigger": "application/octet-stream;base64,ВАШ_MIND_BASE64",
+  "content": "video/mp4;base64,ВАШ_VIDEO_BASE64",
+  "audio": null,
+  "audioEnabled": false,
+  "audioVolume": 0.7,
+  "scale": 1.0,
+  "smooth": 9
+}
