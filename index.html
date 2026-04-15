@@ -5,129 +5,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Player</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
-        #loader { position: fixed; inset: 0; background: #0a0a12; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; }
-        .spinner { width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid #6c5ce7; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        body { margin: 0; background: #000; color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; }
+        #loader { position: fixed; inset: 0; background: #0a0a12; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; transition: opacity 0.3s; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #222; border-top: 5px solid #6c5ce7; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        #status { font-size: 18px; color: #aaa; }
-        #startBtn { display: none; padding: 15px 40px; background: #6c5ce7; color: #fff; border: none; border-radius: 30px; font-size: 20px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        #status { font-size: 16px; color: #888; text-align: center; padding: 0 20px; }
+        #startBtn { display: none; padding: 16px 40px; background: #6c5ce7; color: #fff; border: none; border-radius: 30px; font-size: 18px; font-weight: 600; cursor: pointer; margin-top: 20px; }
         a-scene { width: 100%; height: 100vh; }
-        .hud { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 100; display: none; }
+        .hud { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 25px; font-size: 15px; z-index: 100; display: none; backdrop-filter: blur(8px); }
+        .error { color: #ff6b6b; margin-top: 15px; font-size: 14px; max-width: 80%; text-align: center; }
     </style>
     
     <script>
-        // Умная загрузка библиотек (пробует разные источники)
+        // Надёжная загрузка через GitHub-зеркала (обходит блокировки провайдеров)
         async function loadScript(url) {
             return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = url;
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
+                const s = document.createElement('script');
+                s.src = url;
+                s.onload = resolve;
+                s.onerror = () => reject(url);
+                document.head.appendChild(s);
             });
         }
 
-        async function initSystem() {
+        async function init() {
             const status = document.getElementById('status');
             try {
-                // 1. Загружаем A-Frame
-                status.innerText = "Загрузка движка...";
-                try { await loadScript('https://aframe.io/releases/1.5.0/aframe.min.js'); }
-                catch(e) { await loadScript('https://unpkg.com/aframe@1.5.0/dist/aframe.min.js'); }
+                status.innerText = "Загрузка движка (1/2)...";
+                // Пробуем GitHub-зеркало cdnjs
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/aframe/1.5.0/aframe.min.js');
                 
-                // 2. Загружаем MindAR
-                status.innerText = "Загрузка AR модуля...";
-                try { await loadScript('https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js'); }
-                catch(e) { await loadScript('https://unpkg.com/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js'); }
+                status.innerText = "Загрузка AR модуля (2/2)...";
+                await loadScript('https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js');
                 
-                // Если всё ок, показываем кнопку
-                status.innerText = "Готово!";
+                // Если дошли сюда - всё ок
                 document.getElementById('loader').innerHTML = '<button id="startBtn" onclick="startAR()">👆 Нажми, чтобы начать</button>';
                 document.getElementById('startBtn').style.display = 'block';
-                
             } catch (err) {
-                status.innerText = "Ошибка сети. Проверь интернет.";
-                status.style.color = "red";            }
+                document.getElementById('status').innerHTML = `<span class="error">⛔ Сеть блокирует загрузку скриптов.<br>Попробуйте открыть в Chrome/Safari или отключите VPN/AdBlock.<br><br>Ошибка: ${err}</span>`;
+            }
         }
 
         function startAR() {
-            document.getElementById('loader').style.display = 'none';
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 300);
             
-            // Получаем ID проекта из ссылки
             const urlParams = new URLSearchParams(window.location.search);
             const projectId = urlParams.get('project');
-            
             if (!projectId) {
-                alert('Ошибка: Не указан проект! Ссылка должна быть вида: ?project=ivan-vizitka');
+                alert('Ошибка: добавь ?project=имя_файла в конец ссылки');
                 return;
             }
 
-            // Загружаем данные проекта
             fetch(`data/${projectId}.json`)
-                .then(res => {
-                    if (!res.ok) throw new Error('Проект не найден');
-                    return res.json();
-                })
-                .then(data => {
-                    // Создаем сцену
+                .then(r => { if(!r.ok) throw new Error('Файл проекта не найден'); return r.json(); })
+                .then(d => {
                     const scene = document.createElement('a-scene');
-                    scene.setAttribute('mindar-image', `imageTargetSrc: ${data.trigger}; filterMinCF: 0.0001; filterBeta: 0.001; maxTrack: ${data.smooth || 9};`);
+                    scene.setAttribute('mindar-image', `imageTargetSrc: ${d.trigger}; filterMinCF: 0.0001; filterBeta: 0.001; maxTrack: ${d.smooth||9};`);
                     scene.setAttribute('vr-mode-ui', 'enabled: false');
                     scene.setAttribute('loading-screen', 'enabled: false');
                     document.body.appendChild(scene);
                     
-                    // Активы (видео)
                     const assets = document.createElement('a-assets');
-                    const video = document.createElement('video');
-                    video.id = 'arVideo';
-                    video.src = data.content;
-                    video.setAttribute('loop', '');
-                    video.setAttribute('playsinline', '');
-                    video.setAttribute('crossorigin', '');
-                    video.setAttribute('preload', 'auto');
-                    assets.appendChild(video);
-                    scene.appendChild(assets);
+                    const vid = document.createElement('video');
+                    vid.id = 'arVid'; vid.src = d.content; vid.setAttribute('loop',''); vid.setAttribute('playsinline',''); vid.setAttribute('crossorigin','');
+                    assets.appendChild(vid); scene.appendChild(assets);
                     
-                    // Камера
-                    const camera = document.createElement('a-camera');
-                    camera.setAttribute('position', '0 0 0');
-                    scene.appendChild(camera);
+                    const cam = document.createElement('a-camera'); cam.setAttribute('position','0 0 0'); scene.appendChild(cam);
                     
-                    // Цель (Target)
                     const target = document.createElement('a-entity');
-                    target.setAttribute('mindar-image-target', 'targetIndex: 0');
-                                        // Видео плоскость
-                    const videoPlane = document.createElement('a-video');
-                    videoPlane.setAttribute('src', '#arVideo');
-                    videoPlane.setAttribute('position', '0 0 0.01');
-                    videoPlane.setAttribute('scale', `${data.scale || 1} ${data.scale || 1} 1`);
-                    target.appendChild(videoPlane);
+                    target.setAttribute('mindar-image-target','targetIndex: 0');
+                    const plane = document.createElement('a-video');
+                    plane.setAttribute('src','#arVid'); plane.setAttribute('position','0 0 0.01');
+                    plane.setAttribute('scale',`${d.scale||1} ${d.scale||1} 1`);
+                    target.appendChild(plane); scene.appendChild(target);
                     
-                    scene.appendChild(target);
+                    const hud = document.createElement('div'); hud.className='hud'; hud.innerText='Сканирование...'; document.body.appendChild(hud); hud.style.display='block';
                     
-                    // HUD
-                    const hud = document.createElement('div');
-                    hud.className = 'hud';
-                    hud.innerText = 'Сканирование...';
-                    document.body.appendChild(hud);
-                    hud.style.display = 'block';
-
-                    target.addEventListener('targetFound', () => {
-                        hud.innerText = '✨ Триггер найден!';
-                        hud.style.background = 'rgba(0, 200, 100, 0.8)';
-                        video.play();
-                    });
-                    
-                    target.addEventListener('targetLost', () => {
-                        hud.innerText = '👁 Наведите снова';
-                        hud.style.background = 'rgba(200, 100, 0, 0.8)';
-                        video.pause();
-                    });
+                    target.addEventListener('targetFound', () => { hud.innerText='✨ Найдено!'; hud.style.background='rgba(0,200,100,0.8)'; vid.play(); });
+                    target.addEventListener('targetLost', () => { hud.innerText='👁 Наведите снова'; hud.style.background='rgba(200,100,0,0.8)'; vid.pause(); });
                 })
-                .catch(err => alert('Ошибка: ' + err));
+                .catch(e => alert('Ошибка данных: '+e));
         }
-
-        window.onload = initSystem;
+        window.onload = init;
     </script>
 </head>
 <body>
