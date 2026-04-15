@@ -1,0 +1,10 @@
+{
+  "name": "Клиент 1",
+  "trigger": "data:application/octet-stream;base64,ВСТАВЬТЕ_BASE64_MIND_ФАЙЛА",
+  "content": "data:video/mp4;base64,ВСТАВЬТЕ_BASE64_VIDEO_ИЛИ_ПУТЬ_К_ФАЙЛУ",
+  "audio": null,
+  "audioEnabled": false,
+  "audioVolume": 0.7,
+  "scale": 1.0,
+  "smooth": 9
+}
